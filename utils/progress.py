@@ -21,13 +21,21 @@ class DownloadProgressReporter:
         self.completed = 0
         self.last_milestone = -1
         self.lock = threading.Lock()
+        self.scope_title = ""
 
     def send_threadsafe(self, text: str) -> None:
         self.loop.call_soon_threadsafe(asyncio.create_task, self.send_text(text))
 
+    def set_scope(self, total: int, title: str = "") -> None:
+        self.total = max(0, int(total))
+        self.completed = 0
+        self.last_milestone = -1
+        self.scope_title = title
+
     def on_album(self, album) -> None:
-        self.total = int(getattr(album, "page_count", 0) or 0)
-        title = getattr(album, "name", "") or ""
+        if self.total <= 0:
+            self.total = int(getattr(album, "page_count", 0) or 0)
+        title = self.scope_title or getattr(album, "name", "") or ""
         self.send_threadsafe(f"步骤 2/4 开始下载：《{title}》 共 {self.total} 张图片")
 
     def on_photo(self, photo) -> None:
@@ -52,4 +60,3 @@ class DownloadProgressReporter:
             self.last_milestone = milestone
 
         self.send_threadsafe(render_progress_bar(self.completed, self.total))
-

@@ -41,6 +41,34 @@ def total_cache_size_bytes() -> int:
     return _dir_size_bytes(settings.download_dir)
 
 
+def _format_bytes(size_bytes: int) -> str:
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(max(size_bytes, 0))
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    if unit_index == 0:
+        return f"{int(size)} {units[unit_index]}"
+    return f"{size:.2f} {units[unit_index]}"
+
+
+def cache_usage_summary() -> str:
+    current_size = total_cache_size_bytes()
+    if not settings.auto_lru_cache_enabled:
+        return f"当前缓存占用：{_format_bytes(current_size)}（LRU 自动清理已关闭）"
+
+    limit_bytes = int(settings.local_cache_limit_gb * 1024 * 1024 * 1024)
+    if limit_bytes <= 0:
+        return f"当前缓存占用：{_format_bytes(current_size)}（未设置有效上限）"
+
+    usage_percent = min(100, int(current_size * 100 / limit_bytes)) if limit_bytes > 0 else 0
+    return (
+        f"当前缓存占用：{_format_bytes(current_size)} / {_format_bytes(limit_bytes)} "
+        f"（{usage_percent}%）"
+    )
+
+
 def _connect() -> sqlite3.Connection:
     db_path = settings.cache_db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)

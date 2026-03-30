@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List
 
@@ -10,6 +11,19 @@ from app.config import settings
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 CHUNK_SIZE = 5
 OUTPUT_SUFFIX = ".jpg"
+
+
+@dataclass(frozen=True)
+class LongImagePlan:
+    overall_index: int
+    photo_id: str
+    photo_label: str
+    chunk_index: int
+    start_page: int
+    end_page: int
+    image_indices: tuple[int, ...]
+    source_paths: tuple[Path, ...]
+    output_path: Path
 
 
 def collect_images(folder: Path) -> List[Path]:
@@ -118,6 +132,28 @@ def merge_images_vertically(image_paths: List[Path], output_path: Path) -> None:
             img.close()
         for img in images:
             img.close()
+
+
+def output_needs_generation(output_path: Path, source_paths: Iterable[Path]) -> bool:
+    source_paths = list(source_paths)
+    if not source_paths:
+        return False
+    if not output_path.exists():
+        return True
+
+    try:
+        output_mtime = output_path.stat().st_mtime
+    except FileNotFoundError:
+        return True
+
+    newest_source = 0.0
+    for path in source_paths:
+        try:
+            newest_source = max(newest_source, path.stat().st_mtime)
+        except FileNotFoundError:
+            return True
+
+    return newest_source > output_mtime
 
 
 def generate_long_images(album_dir: Path, output_root: Path) -> List[Path]:

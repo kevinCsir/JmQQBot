@@ -3,11 +3,11 @@ import asyncio
 from urllib.parse import quote
 
 from app.config import ROOT_DIR, settings
-from app.services.cache_service import enforce_cache_limit, touch_album
-from app.services.jm_service import count_local_images, download_album
+from app.services.cache_service import cache_usage_summary, enforce_cache_limit, touch_album
+from app.services.jm_service import build_long_image_selection, download_images_for_selection
 from app.services.qq_api import qq_api_service
 from utils.command_parser import AlbumSendCommand
-from utils.image_merge import expected_long_image_paths, generate_long_images, needs_long_image_generation
+from utils.image_merge import merge_images_vertically, output_needs_generation
 from utils.progress import DownloadProgressReporter
 
 
@@ -21,62 +21,84 @@ async def handle(command: AlbumSendCommand, user_openid: str, msg_id: str, publi
     request_label = _describe_request(command)
     touch_album(command.album_id)
     await qq_api_service.send_text(user_openid, msg_id, f"收到编号 {command.album_id}，准备发送{request_label}")
-    await qq_api_service.send_text(user_openid, msg_id, "步骤 1/4 检查本地资源")
+    await qq_api_service.send_text(user_openid, msg_id, "步骤 1/4 计算目标范围")
 
-    local_count = count_local_images(command.album_id)
-    if local_count > 0:
-        await qq_api_service.send_text(user_openid, msg_id, f"本地已存在 {local_count} 张图片，跳过下载")
+    try:
+        selection = await asyncio.to_thread(build_long_image_selection, command.album_id, command.start_index, command.end_index)
+    except Exception as exc:
+        await qq_api_service.send_text(user_openid, msg_id, f"资源规划失败：{exc}")
+        return
+
+    if not selection.plans:
+        await qq_api_service.send_text(user_openid, msg_id, "没有可发送的长图，任务结束")
+        return
+
+    await qq_api_service.send_text(
+        user_openid,
+        msg_id,
+        f"已定位到 {len(selection.plans)} 张目标长图，对应 {selection.total_requested_images} 张原图",
+    )
+
+    await qq_api_service.send_text(user_openid, msg_id, "步骤 2/4 检查并补齐原图")
+    if selection.missing_image_count <= 0:
+        await qq_api_service.send_text(
+            user_openid,
+            msg_id,
+            f"所需原图已齐全，共 {selection.existing_image_count} 张，跳过下载",
+        )
+        await qq_api_service.send_text(user_openid, msg_id, cache_usage_summary())
     else:
-        await qq_api_service.send_text(user_openid, msg_id, "本地未找到资源，准备下载")
+        await qq_api_service.send_text(
+            user_openid,
+            msg_id,
+            f"本地已命中 {selection.existing_image_count}/{selection.total_requested_images} 张，准备补齐缺失的 {selection.missing_image_count} 张",
+        )
         reporter = DownloadProgressReporter(
             asyncio.get_running_loop(),
             lambda text: qq_api_service.send_text(user_openid, msg_id, text),
         )
         try:
-            await asyncio.to_thread(download_album, command.album_id, reporter)
+            await asyncio.to_thread(download_images_for_selection, selection, reporter)
         except Exception as exc:
             await qq_api_service.send_text(user_openid, msg_id, f"下载失败：{exc}")
             return
-        local_count = count_local_images(command.album_id)
-        await qq_api_service.send_text(user_openid, msg_id, f"下载完成，本地现有 {local_count} 张图片")
+        await qq_api_service.send_text(user_openid, msg_id, f"下载完成，已补齐目标原图")
         deleted = enforce_cache_limit()
         if deleted:
             await qq_api_service.send_text(user_openid, msg_id, f"本地缓存超阈值，已按 LRU 清理：{', '.join(deleted)}")
+        await qq_api_service.send_text(user_openid, msg_id, cache_usage_summary())
 
-    if local_count <= 0:
-        await qq_api_service.send_text(user_openid, msg_id, "未找到可处理的图片，任务结束")
-        return
-
-    album_dir = settings.download_dir / command.album_id
-    await qq_api_service.send_text(user_openid, msg_id, "步骤 3/4 检查 5 合 1 长图")
-    if needs_long_image_generation(album_dir, settings.longimg_dir):
-        await qq_api_service.send_text(user_openid, msg_id, "开始生成长图")
-        try:
-            longimg_paths = await asyncio.to_thread(generate_long_images, album_dir, settings.longimg_dir)
-        except Exception as exc:
-            await qq_api_service.send_text(user_openid, msg_id, f"长图生成失败：{exc}")
-            return
-        await qq_api_service.send_text(user_openid, msg_id, f"长图生成完成，共 {len(longimg_paths)} 张")
+    await qq_api_service.send_text(user_openid, msg_id, "步骤 3/4 生成目标长图")
+    generated_count = 0
+    reused_count = 0
+    for plan in selection.plans:
+        if output_needs_generation(plan.output_path, plan.source_paths):
+            try:
+                await asyncio.to_thread(merge_images_vertically, list(plan.source_paths), plan.output_path)
+            except Exception as exc:
+                await qq_api_service.send_text(user_openid, msg_id, f"长图生成失败：{exc}")
+                return
+            generated_count += 1
+        else:
+            reused_count += 1
+    if generated_count > 0:
+        await qq_api_service.send_text(
+            user_openid,
+            msg_id,
+            f"长图处理完成，新生成 {generated_count} 张，复用 {reused_count} 张",
+        )
     else:
-        longimg_paths = expected_long_image_paths(album_dir, settings.longimg_dir)
-        await qq_api_service.send_text(user_openid, msg_id, "长图已存在且是最新版本，跳过生成")
+        await qq_api_service.send_text(user_openid, msg_id, "目标长图已存在且是最新版本，跳过生成")
 
-    start_pos = max(command.start_index - 1, 0)
-    selected_paths = longimg_paths[start_pos:command.end_index]
-    if not selected_paths:
-        await qq_api_service.send_text(user_openid, msg_id, "没有可发送的长图，任务结束")
-        return
-
-    await qq_api_service.send_text(user_openid, msg_id, f"步骤 4/4 开始发送，共 {len(selected_paths)} 张长图")
+    await qq_api_service.send_text(user_openid, msg_id, f"步骤 4/4 开始发送，共 {len(selection.plans)} 张长图")
     success_count = 0
-    for index, image_path in enumerate(selected_paths, start=1):
-        actual_index = start_pos + index
-        label = f"第 {actual_index} 张长图（本次 {index}/{len(selected_paths)}）"
+    for index, plan in enumerate(selection.plans, start=1):
+        label = f"第 {plan.overall_index} 张长图（本次 {index}/{len(selection.plans)}）"
         await qq_api_service.send_text(user_openid, msg_id, f"发送{label}")
         sent = await qq_api_service.send_image_with_retry(
             user_openid=user_openid,
             msg_id=msg_id,
-            url=public_file_url(public_base_url, image_path),
+            url=public_file_url(public_base_url, plan.output_path),
             label=label,
         )
         if sent:
@@ -86,7 +108,7 @@ async def handle(command: AlbumSendCommand, user_openid: str, msg_id: str, publi
             return
         await asyncio.sleep(settings.image_send_interval_seconds)
 
-    if command.range_text == "default" and len(longimg_paths) > settings.default_preview_count:
+    if command.range_text == "default" and len(selection.plans) >= settings.default_preview_count:
         await qq_api_service.send_text(
             user_openid,
             msg_id,
