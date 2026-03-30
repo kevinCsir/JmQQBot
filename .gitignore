@@ -8,6 +8,7 @@ downloads_longimg/
 downloads_pdf/
 
 scripts/load_env.sh
+scripts/load_env.bat
 ngrok_recovery_codes.txt
 .autojm_cache_state.json
 .autojm_cache.db

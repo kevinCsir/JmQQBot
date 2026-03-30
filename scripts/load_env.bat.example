@@ -1,0 +1,68 @@
+@echo off
+rem AutoJm 环境变量模板
+rem 用法：
+rem 1. 复制本文件为 scripts\load_env.bat
+rem 2. 按注释填写真实值
+rem 3. 运行 scripts\start.bat
+
+rem 服务监听地址
+rem 一般本机运行保持默认即可。
+set "AUTOJM_HOST=0.0.0.0"
+
+rem 服务监听端口
+rem QQ 回调和 ngrok/Cloudflare Tunnel 最终都会转发到这个端口。
+set "AUTOJM_PORT=8080"
+
+rem QQ 机器人 AppID
+rem 获取位置：QQ开放平台 -> 机器人管理后台 -> 开发管理 / 代码开发
+set "QQ_BOT_APP_ID="
+
+rem QQ 机器人 Secret
+rem 获取位置：QQ开放平台 -> 机器人管理后台 -> 开发管理 / 代码开发
+rem 注意：这是敏感信息，不要提交到仓库。
+set "QQ_BOT_SECRET="
+
+rem 是否使用 QQ 沙箱环境
+rem 1 表示沙箱，0 表示正式环境。
+rem 获取依据：如果你当前机器人还在沙箱测试，就填 1。
+set "QQ_BOT_IS_SANDBOX=1"
+
+rem 默认预览长图数量
+rem 当用户只发“123456”时，默认发送前多少张长图。
+set "AUTOJM_DEFAULT_PREVIEW_COUNT=5"
+
+rem 搜索时最多取多少页进入随机池
+rem 影响 search / sr 指令的随机范围，数字越大越随机，但请求也越多。
+set "AUTOJM_TAG_SEARCH_PAGE_LIMIT=3"
+
+rem 每次搜索最终随机返回多少条结果
+set "AUTOJM_TAG_SEARCH_RESULT_COUNT=5"
+
+rem 单张图片发送失败时最多重试几次
+set "AUTOJM_IMAGE_SEND_MAX_RETRIES=3"
+
+rem 图片发送失败后的重试间隔，单位秒，逗号分隔
+set "AUTOJM_IMAGE_SEND_RETRY_DELAYS=1,2,4"
+
+rem 每张长图发送完成后，额外等待多久再发下一张，单位秒
+set "AUTOJM_IMAGE_SEND_INTERVAL_SECONDS=0.8"
+
+rem 5 合 1 长图的最大宽度
+rem 数值越小，图片越容易发送成功，但清晰度会略降。
+set "AUTOJM_LONGIMG_MAX_WIDTH=720"
+
+rem 5 合 1 长图的 JPEG 压缩质量，范围通常 1-95
+rem 数值越小，体积越小。
+set "AUTOJM_LONGIMG_JPEG_QUALITY=72"
+
+rem 是否启用本地缓存 LRU 自动清理
+rem 1 表示启用，0 表示关闭。
+set "AUTOJM_AUTO_LRU_CACHE=1"
+
+rem 本地下载缓存上限，单位 GB
+rem 超过后会按最近最少使用策略删除旧本子。
+set "AUTOJM_LOCAL_CACHE_LIMIT_GB=5"
+
+rem 本地缓存数据库路径
+rem 用于记录 LRU 访问时间和清理日志。一般保持默认即可。
+set "AUTOJM_CACHE_DB_PATH=.\.autojm_cache.db"
