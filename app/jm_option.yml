@@ -1,0 +1,12 @@
+log: true
+
+download:
+  cache: true
+  image:
+    decode: true
+    suffix: .png
+
+dir_rule:
+  base_dir: ./downloads
+  rule: Bd / Aid / Pindex
+
