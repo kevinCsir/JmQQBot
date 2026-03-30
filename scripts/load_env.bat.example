@@ -1,5 +1,5 @@
 @echo off
-rem AutoJm 环境变量模板
+rem 项目环境变量模板
 rem 用法：
 rem 1. 复制本文件为 scripts\load_env.bat
 rem 2. 按注释填写真实值
@@ -60,7 +60,7 @@ rem 1 表示启用，0 表示关闭。
 set "AUTOJM_AUTO_LRU_CACHE=1"
 
 rem 本地下载缓存上限，单位 GB
-rem 超过后会按最近最少使用策略删除旧本子。
+rem 超过后会按最近最少使用策略删除旧资源目录。
 set "AUTOJM_LOCAL_CACHE_LIMIT_GB=5"
 
 rem 本地缓存数据库路径

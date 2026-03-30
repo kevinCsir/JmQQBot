@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# AutoJm 环境变量模板
+# 项目环境变量模板
 # 用法：
 # 1. 复制本文件为 scripts/load_env.sh
 # 2. 按注释填写真实值
@@ -62,7 +62,7 @@ export AUTOJM_LONGIMG_JPEG_QUALITY="72"
 export AUTOJM_AUTO_LRU_CACHE="1"
 
 # 本地下载缓存上限，单位 GB
-# 超过后会按最近最少使用策略删除旧本子。
+# 超过后会按最近最少使用策略删除旧资源目录。
 export AUTOJM_LOCAL_CACHE_LIMIT_GB="5"
 
 # 本地缓存数据库路径
