@@ -13,12 +13,12 @@ ngrok_recovery_codes.txt
 .autojm_cache_state.json
 .autojm_cache.db
 
-JMComic-Crawler-Python/
-download_with_longimg_chunk.py
-images_to_pdf.py
-images_to_longpng.py
-option_chunk.yml
-option_pdf_download.yml
-qq_callback.py
-qq_bot_workflow.py
-start_qqbot_callback.sh
+/JMComic-Crawler-Python/
+/download_with_longimg_chunk.py
+/images_to_pdf.py
+/images_to_longpng.py
+/option_chunk.yml
+/option_pdf_download.yml
+/qq_callback.py
+/qq_bot_workflow.py
+/start_qqbot_callback.sh
