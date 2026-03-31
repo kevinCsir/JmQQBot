@@ -190,6 +190,50 @@ def remove_album_cache(album_id: str) -> None:
             shutil.rmtree(path, ignore_errors=True)
 
 
+def clear_all_cached_media() -> dict[str, int | str]:
+    init_db()
+
+    album_ids: set[str] = set()
+    file_count = 0
+    freed_size_bytes = 0
+    roots = [settings.download_dir, settings.longimg_dir, settings.pdf_dir]
+
+    for root in roots:
+        if not root.exists():
+            continue
+
+        for child in root.iterdir():
+            album_ids.add(child.name)
+
+        for child in root.rglob("*"):
+            if not child.is_file():
+                continue
+            file_count += 1
+            try:
+                freed_size_bytes += child.stat().st_size
+            except FileNotFoundError:
+                continue
+
+        shutil.rmtree(root, ignore_errors=True)
+        root.mkdir(parents=True, exist_ok=True)
+
+    with _connect() as conn:
+        conn.execute("DELETE FROM album_cache")
+        _log_event(
+            conn,
+            "cache_cleared",
+            None,
+            f"手动清空全部图片缓存，删除 {len(album_ids)} 个目录、{file_count} 个文件，释放约 {freed_size_bytes} 字节",
+        )
+
+    return {
+        "album_count": len(album_ids),
+        "file_count": file_count,
+        "freed_size_bytes": freed_size_bytes,
+        "freed_size_text": _format_bytes(freed_size_bytes),
+    }
+
+
 def enforce_cache_limit() -> list[str]:
     if not settings.auto_lru_cache_enabled:
         return []

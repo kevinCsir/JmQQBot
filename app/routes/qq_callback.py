@@ -7,11 +7,12 @@ from fastapi import APIRouter, HTTPException, Request
 from nacl.signing import SigningKey, VerifyKey
 
 from app.services.qq_api import qq_api_service
-from biz import album_info, album_send, help, search
+from biz import album_info, album_send, cache_clear, help, search
 from utils.command_parser import (
     AlbumInfoCommand,
     AlbumSendCommand,
     HelpCommand,
+    RemoveCacheCommand,
     SearchCommand,
     parse_command,
 )
@@ -70,6 +71,8 @@ def command_key(command, user_openid: str):
         return album_info.dedupe_key(command, user_openid)
     if isinstance(command, HelpCommand):
         return help.dedupe_key(command, user_openid)
+    if isinstance(command, RemoveCacheCommand):
+        return cache_clear.dedupe_key(command, user_openid)
     if isinstance(command, SearchCommand):
         return search.dedupe_key(command, user_openid)
     raise TypeError(f"Unsupported command: {type(command)}")
@@ -93,6 +96,8 @@ def schedule_command(command, user_openid: str, msg_id: str, public_base_url: st
                 await album_info.handle(command, user_openid, msg_id)
             elif isinstance(command, HelpCommand):
                 await help.handle(command, user_openid, msg_id)
+            elif isinstance(command, RemoveCacheCommand):
+                await cache_clear.handle(command, user_openid, msg_id)
             elif isinstance(command, SearchCommand):
                 await search.handle(command, user_openid, msg_id)
         finally:

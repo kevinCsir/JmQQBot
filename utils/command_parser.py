@@ -29,7 +29,12 @@ class HelpCommand:
     pass
 
 
-ParsedCommand = AlbumSendCommand | AlbumInfoCommand | SearchCommand | HelpCommand | None
+@dataclass(frozen=True)
+class RemoveCacheCommand:
+    pass
+
+
+ParsedCommand = AlbumSendCommand | AlbumInfoCommand | SearchCommand | HelpCommand | RemoveCacheCommand | None
 
 
 def parse_album_command(content: str) -> AlbumSendCommand | AlbumInfoCommand | None:
@@ -113,9 +118,16 @@ def parse_help_command(content: str) -> HelpCommand | None:
     return None
 
 
+def parse_remove_cache_command(content: str) -> RemoveCacheCommand | None:
+    if re.fullmatch(r"rm", content.strip(), flags=re.IGNORECASE):
+        return RemoveCacheCommand()
+    return None
+
+
 def parse_command(content: str) -> ParsedCommand:
     return (
         parse_help_command(content)
+        or parse_remove_cache_command(content)
         or parse_filter_info_command(content)
         or parse_search_command(content)
         or parse_album_command(content)
