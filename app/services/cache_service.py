@@ -160,6 +160,30 @@ def init_db() -> None:
             ON cache_events(created_at)
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS album_command_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                album_id TEXT NOT NULL,
+                album_title TEXT NOT NULL,
+                command_type TEXT NOT NULL,
+                command_text TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_album_command_logs_created_at
+            ON album_command_logs(created_at)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_album_command_logs_album_id
+            ON album_command_logs(album_id)
+            """
+        )
         _migrate_legacy_json_if_needed(conn)
 
 
@@ -181,6 +205,20 @@ def touch_album(album_id: str) -> None:
                 updated_at = excluded.updated_at
             """,
             (album_id, now_ts, size_bytes, now_ts, now_ts),
+        )
+
+
+def log_album_command(album_id: str, album_title: str, command_type: str, command_text: str) -> None:
+    init_db()
+    normalized_title = album_title.strip() or album_id
+    normalized_command_text = command_text.strip() or album_id
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO album_command_logs (album_id, album_title, command_type, command_text, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (album_id, normalized_title, command_type, normalized_command_text, _now_ts()),
         )
 
 
@@ -311,3 +349,35 @@ def list_cache_events(limit: int = 50) -> list[dict]:
             (limit,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def list_album_command_logs(limit: int = 50) -> list[dict]:
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, album_id, album_title, command_type, command_text, created_at
+            FROM album_command_logs
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_recent_unique_album_logs(limit: int = 10, scan_limit: int = 200) -> list[dict]:
+    rows = list_album_command_logs(limit=max(limit, scan_limit))
+    unique_rows: list[dict] = []
+    seen_album_ids: set[str] = set()
+
+    for row in rows:
+        album_id = str(row["album_id"])
+        if album_id in seen_album_ids:
+            continue
+        seen_album_ids.add(album_id)
+        unique_rows.append(row)
+        if len(unique_rows) >= limit:
+            break
+
+    return unique_rows
