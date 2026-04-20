@@ -3,7 +3,7 @@ import asyncio
 from urllib.parse import quote
 
 from app.config import ROOT_DIR, settings
-from app.services.cache_service import cache_usage_summary, enforce_cache_limit, touch_album
+from app.services.cache_service import cache_usage_summary, enforce_cache_limit, log_album_command, touch_album
 from app.services.jm_service import build_long_image_selection, download_images_for_selection
 from app.services.qq_api import qq_api_service
 from utils.command_parser import AlbumSendCommand
@@ -32,6 +32,14 @@ async def handle(command: AlbumSendCommand, user_openid: str, msg_id: str, publi
     if not selection.plans:
         await qq_api_service.send_text(user_openid, msg_id, "没有可发送的长图，任务结束")
         return
+
+    await asyncio.to_thread(
+        log_album_command,
+        command.album_id,
+        selection.album_title,
+        "send",
+        _command_text(command),
+    )
 
     await qq_api_service.send_text(
         user_openid,
@@ -128,3 +136,9 @@ def _describe_request(command: AlbumSendCommand) -> str:
     if command.start_index == 1 and command.end_index == settings.default_preview_count:
         return f"前 {settings.default_preview_count} 张长图"
     return f"第 {command.start_index}-{command.end_index} 张长图"
+
+
+def _command_text(command: AlbumSendCommand) -> str:
+    if command.range_text == "default":
+        return command.album_id
+    return f"{command.album_id} {command.range_text}"
