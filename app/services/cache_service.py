@@ -364,3 +364,20 @@ def list_album_command_logs(limit: int = 50) -> list[dict]:
             (limit,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def list_recent_unique_album_logs(limit: int = 10, scan_limit: int = 200) -> list[dict]:
+    rows = list_album_command_logs(limit=max(limit, scan_limit))
+    unique_rows: list[dict] = []
+    seen_album_ids: set[str] = set()
+
+    for row in rows:
+        album_id = str(row["album_id"])
+        if album_id in seen_album_ids:
+            continue
+        seen_album_ids.add(album_id)
+        unique_rows.append(row)
+        if len(unique_rows) >= limit:
+            break
+
+    return unique_rows
